@@ -75,10 +75,21 @@ class _PinItem extends StatelessWidget {
         return SizedBox(key: key, child: state.widget.obscuringWidget);
       }
 
-      return Text(
-        state.widget.obscureText ? state.widget.obscuringCharacter : pin[index],
-        key: key,
-        style: pinTheme.textStyle,
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            state.widget.obscureText
+                ? state.widget.obscuringCharacter
+                : pin[index],
+            key: key,
+            style: pinTheme.textStyle,
+          ),
+          if (state.widget.preFilledWidget != null)
+            Transform.translate(
+                offset: Offset(0, 16),
+                child: SizedBox(child: state.widget.preFilledWidget))
+        ],
       );
     }
 

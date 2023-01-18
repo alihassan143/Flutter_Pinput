@@ -483,6 +483,7 @@ class _PinputState extends State<Pinput>
             duration: widget.animationDuration,
             alignment: Alignment.topCenter,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: widget.crossAxisAlignment,
               children: [
                 onlyFields(),
