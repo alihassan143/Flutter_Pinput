@@ -1,17 +1,19 @@
 part of '../pinput.dart';
 
 class _PinputFormField extends FormField<String> {
-  _PinputFormField({
+  const _PinputFormField({
     required final FormFieldValidator<String>? validator,
     required final bool enabled,
-    required final Widget child,
+    required final String? initialValue,
+    required final Widget Function(FormFieldState<String> field) builder,
     Key? key,
   }) : super(
           key: key,
           enabled: enabled,
           validator: validator,
           autovalidateMode: AutovalidateMode.disabled,
-          builder: (FormFieldState<String> field) => child,
+          initialValue: initialValue,
+          builder: builder,
         );
 }
 

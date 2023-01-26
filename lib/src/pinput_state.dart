@@ -19,7 +19,7 @@ class _PinputState extends State<Pinput>
       GlobalKey<EditableTextState>();
 
   @override
-  bool get selectionEnabled => false;
+  bool get selectionEnabled => widget.toolbarEnabled;
 
   @override
   String get autofillId => _editableText!.autofillId;
@@ -92,7 +92,7 @@ class _PinputState extends State<Pinput>
 
   /// Android Autofill
   void _maybeInitSmartAuth() async {
-    final isAndroid = defaultTargetPlatform == TargetPlatform.android;
+    final isAndroid = UniversalPlatform.isAndroid;
     final isAutofillEnabled =
         widget.androidSmsAutofillMethod != AndroidSmsAutofillMethod.none;
 
@@ -228,22 +228,35 @@ class _PinputState extends State<Pinput>
     TextSelection selection,
     SelectionChangedCause? cause,
   ) {
+    _effectiveController.selection =
+        TextSelection.collapsed(offset: pin.length);
+
     switch (Theme.of(context).platform) {
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
-        if (cause == SelectionChangedCause.longPress ||
-            cause == SelectionChangedCause.drag) {
-          _editableText?.bringIntoView(selection.extent);
-        }
-        return;
       case TargetPlatform.linux:
       case TargetPlatform.windows:
       case TargetPlatform.fuchsia:
       case TargetPlatform.android:
-        if (cause == SelectionChangedCause.drag) {
+        if (cause == SelectionChangedCause.longPress ||
+            cause == SelectionChangedCause.drag) {
           _editableText?.bringIntoView(selection.extent);
         }
-        return;
+        break;
+    }
+
+    switch (Theme.of(context).platform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.android:
+        break;
+      case TargetPlatform.macOS:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        if (cause == SelectionChangedCause.drag) {
+          _editableText?.hideToolbar();
+        }
+        break;
     }
   }
 
@@ -336,41 +349,47 @@ class _PinputState extends State<Pinput>
     return _PinputFormField(
       enabled: isEnabled,
       validator: _validator,
-      child: FocusTrapArea(
-        focusNode: effectiveFocusNode,
-        child: MouseRegion(
-          cursor: _effectiveMouseCursor,
-          onEnter: (PointerEnterEvent event) => _handleHover(true),
-          onExit: (PointerExitEvent event) => _handleHover(false),
-          child: IgnorePointer(
-            ignoring: !isEnabled || !widget.useNativeKeyboard,
-            child: AnimatedBuilder(
-              animation: _effectiveController,
-              builder: (_, Widget? child) => Semantics(
-                maxValueLength: widget.length,
-                currentValueLength: _currentLength,
-                onTap: widget.readOnly ? null : _semanticsOnTap,
-                onDidGainAccessibilityFocus: handleDidGainAccessibilityFocus,
-                child: child,
-              ),
-              child: _gestureDetectorBuilder.buildGestureDetector(
-                behavior: HitTestBehavior.translucent,
-                child: Stack(
-                  alignment: Alignment.topCenter,
-                  children: [
-                    _buildEditable(textSelectionControls),
-                    _buildFields(),
-                  ],
+      initialValue: _effectiveController.text,
+      builder: (FormFieldState<String> field) {
+        return TextFieldTapRegion(
+          onTapOutside: widget.onTapOutside,
+          child: MouseRegion(
+            cursor: _effectiveMouseCursor,
+            onEnter: (PointerEnterEvent event) => _handleHover(true),
+            onExit: (PointerExitEvent event) => _handleHover(false),
+            child: IgnorePointer(
+              ignoring: !isEnabled || !widget.useNativeKeyboard,
+              child: AnimatedBuilder(
+                animation: _effectiveController,
+                builder: (_, Widget? child) => Semantics(
+                  maxValueLength: widget.length,
+                  currentValueLength: _currentLength,
+                  onTap: widget.readOnly ? null : _semanticsOnTap,
+                  onDidGainAccessibilityFocus: handleDidGainAccessibilityFocus,
+                  child: child,
+                ),
+                child: _gestureDetectorBuilder.buildGestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  child: Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      _buildEditable(textSelectionControls, field),
+                      _buildFields(),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildEditable(TextSelectionControls? textSelectionControls) {
+  Widget _buildEditable(
+    TextSelectionControls? textSelectionControls,
+    FormFieldState<String> field,
+  ) {
     final formatters = <TextInputFormatter>[
       ...widget.inputFormatters,
       LengthLimitingTextInputFormatter(
@@ -383,9 +402,11 @@ class _PinputState extends State<Pinput>
       child: UnmanagedRestorationScope(
         bucket: bucket,
         child: EditableText(
+          key: editableTextKey,
           maxLines: 1,
           style: PinputConstants._hiddenTextStyle,
-          onChanged: (_) {
+          onChanged: (value) {
+            field.didChange(value);
             _maybeUseHaptic(widget.hapticFeedbackType);
           },
           expands: false,
@@ -398,10 +419,8 @@ class _PinputState extends State<Pinput>
           enableIMEPersonalizedLearning: false,
           textInputAction: widget.textInputAction,
           textCapitalization: widget.textCapitalization,
-          toolbarOptions: widget.toolbarOptions,
           selectionColor: Colors.transparent,
           keyboardType: widget.keyboardType,
-          textDirection: TextDirection.ltr,
           obscureText: widget.obscureText,
           onSubmitted: (s) {
             widget.onSubmitted?.call(s);
@@ -412,7 +431,6 @@ class _PinputState extends State<Pinput>
           textAlign: TextAlign.center,
           autofocus: widget.autofocus,
           inputFormatters: formatters,
-          key: editableTextKey,
           restorationId: 'pinput',
           clipBehavior: Clip.hardEdge,
           cursorColor: Colors.transparent,
@@ -423,9 +441,10 @@ class _PinputState extends State<Pinput>
           backgroundCursorColor: Colors.transparent,
           selectionHeightStyle: BoxHeightStyle.tight,
           enableSuggestions: widget.enableSuggestions,
-          onSelectionChanged: _handleSelectionChanged,
+          contextMenuBuilder: widget.contextMenuBuilder,
           obscuringCharacter: widget.obscuringCharacter,
           onAppPrivateCommand: widget.onAppPrivateCommand,
+          onSelectionChanged: _handleSelectionChanged,
           onSelectionHandleTapped: _handleSelectionHandleTapped,
           readOnly: widget.readOnly || !isEnabled || !widget.useNativeKeyboard,
           selectionControls:
@@ -483,7 +502,6 @@ class _PinputState extends State<Pinput>
             duration: widget.animationDuration,
             alignment: Alignment.topCenter,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: widget.crossAxisAlignment,
               children: [
                 onlyFields(),
@@ -519,9 +537,8 @@ class _PinputState extends State<Pinput>
           child: Text(
             _errorText!,
             style: widget.errorTextStyle ??
-                theme.textTheme.subtitle1?.copyWith(
-                  color: theme.errorColor,
-                ),
+                theme.textTheme.titleMedium
+                    ?.copyWith(color: theme.colorScheme.error),
           ),
         );
       }

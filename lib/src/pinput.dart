@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:smart_auth/smart_auth.dart';
+import 'package:universal_platform/universal_platform.dart';
 
 part 'pinput_state.dart';
 
@@ -85,7 +86,6 @@ class Pinput extends StatefulWidget {
     this.closeKeyboardWhenCompleted = true,
     this.keyboardType = TextInputType.number,
     this.textCapitalization = TextCapitalization.none,
-    this.toolbarOptions = const ToolbarOptions(paste: true),
     this.slideTransitionBeginOffset,
     this.cursor,
     this.keyboardAppearance,
@@ -106,6 +106,8 @@ class Pinput extends StatefulWidget {
     this.errorTextStyle,
     this.pinputAutovalidateMode = PinputAutovalidateMode.onSubmit,
     this.scrollPadding = const EdgeInsets.all(20),
+    this.contextMenuBuilder = _defaultContextMenuBuilder,
+    this.onTapOutside,
     Key? key,
   })  : assert(obscuringCharacter.length == 1),
         assert(length > 0),
@@ -285,13 +287,6 @@ class Pinput extends StatefulWidget {
   /// [TextInputType.multiline] and [TextInputAction.done] otherwise.
   final TextInputAction? textInputAction;
 
-  /// Configuration of toolbar options.
-  ///
-  /// If not set, select all and paste will default to be enabled. Copy and cut
-  /// will be disabled if [obscureText] is true. If [readOnly] is true,
-  /// paste and cut will be disabled regardless.
-  final ToolbarOptions toolbarOptions;
-
   /// See [EditableText.autofillHints]
   final Iterable<String>? autofillHints;
 
@@ -343,6 +338,32 @@ class Pinput extends StatefulWidget {
 
   /// Optional parameter for Android SMS User Consent API.
   final String? senderPhoneNumber;
+
+  /// {@macro flutter.widgets.EditableText.contextMenuBuilder}
+  ///
+  /// If not provided, will build a default menu based on the platform.
+  ///
+  /// See also:
+  ///
+  ///  * [AdaptiveTextSelectionToolbar], which is built by default.
+  final EditableTextContextMenuBuilder? contextMenuBuilder;
+
+  /// A callback to be invoked when a tap is detected outside of this [TapRegion]
+  /// The [PointerDownEvent] passed to the function is the event that caused the
+  /// notification. If this region is part of a group
+  /// then it's possible that the event may be outside of this immediate region,
+  /// although it will be within the region of one of the group members.
+  /// This is useful if you want to unfocus the [Pinput] when user taps outside of it
+  final TapRegionCallback? onTapOutside;
+
+  static Widget _defaultContextMenuBuilder(
+    BuildContext context,
+    EditableTextState editableTextState,
+  ) {
+    return AdaptiveTextSelectionToolbar.editableText(
+      editableTextState: editableTextState,
+    );
+  }
 
   @override
   State<Pinput> createState() => _PinputState();
@@ -533,7 +554,6 @@ class Pinput extends StatefulWidget {
         defaultValue: null,
       ),
     );
-
     properties
         .add(DiagnosticsProperty<bool>('enabled', enabled, defaultValue: true));
     properties.add(
@@ -627,13 +647,6 @@ class Pinput extends StatefulWidget {
       ),
     );
     properties.add(
-      DiagnosticsProperty<ToolbarOptions>(
-        'toolbarOptions',
-        toolbarOptions,
-        defaultValue: const ToolbarOptions(paste: true),
-      ),
-    );
-    properties.add(
       DiagnosticsProperty<Iterable<String>?>(
         'autofillHints',
         autofillHints,
@@ -708,6 +721,13 @@ class Pinput extends StatefulWidget {
         'senderPhoneNumber',
         senderPhoneNumber,
         defaultValue: null,
+      ),
+    );
+    properties.add(
+      DiagnosticsProperty<EditableTextContextMenuBuilder?>(
+        'contextMenuBuilder',
+        contextMenuBuilder,
+        defaultValue: _defaultContextMenuBuilder,
       ),
     );
   }
